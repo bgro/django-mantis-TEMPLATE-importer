@@ -18,7 +18,7 @@
 
 from dingos.importer import DingoImportCommand
 
-from mantis_TEMPLATE_importer.importer import ImporterModule
+from mantis_TEMPLATE_importer.importer import TEMPLATE_Import as ImporterModule
 
 class Command(DingoImportCommand):
     """

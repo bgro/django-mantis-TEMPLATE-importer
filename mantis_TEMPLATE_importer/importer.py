@@ -338,7 +338,8 @@ class TEMPLATE_Import:
 
         if identifier_ns_uri:
             self.identifier_ns_uri = identifier_ns_uri
-
+        else:
+            self.identifier_ns_uri = 'test'
 
         # Use the generic XML import customized for  OpenIOC import
         # to turn XML into DingoObjDicts
@@ -360,13 +361,11 @@ class TEMPLATE_Import:
 
         embedded_objects = import_result['embedded_objects']
 
-        default_ns = self.namespace_dict.get(elt_dict.get('@@ns',None),'http://schemas.mandiant.com/unknown/ioc')
+        default_ns = self.namespace_dict.get(elt_dict.get('@@ns',None))
 
         # Export family information.
-        family_info_dict = search_by_re_list(self.RE_LIST_NS_TYPE_FROM_NS_URL,default_ns)
-        if family_info_dict:
-            self.iobject_family_name=family_info_dict['family']
-            self.iobject_family_revision_name=family_info_dict['revision']
+        self.iobject_family_name='TEMPLATE'
+        self.iobject_family_revision_name=''
 
 
         # Initialize stack with import_results.
@@ -398,7 +397,7 @@ class TEMPLATE_Import:
                                           iobject_type_revision_name= '',
                                           iobject_data=elt_dict,
                                           uid=id_and_rev_info['id'],
-                                          identifier_ns_uri= identifier_ns_uri,
+                                          identifier_ns_uri= 'FIXTHIS',#identifier_ns_uri,
                                           timestamp = ts,
                                           create_timestamp = self.create_timestamp,
                                           markings=markings,
