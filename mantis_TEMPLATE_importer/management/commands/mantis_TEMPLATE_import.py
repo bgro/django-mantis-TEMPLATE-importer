@@ -18,15 +18,18 @@
 
 from dingos.importer import DingoImportCommand
 
-from mantis_TEMPLATE_importer.importer import TEMPLATE_Import as ImporterModule
+from mantis_TEMPLATE_importer.importer import TEMPLATE_Import
 
 class Command(DingoImportCommand):
     """
-    This class implements the command for importing a OpenIOC XML
+    This class implements the command for importing TEMPLATE_Import
     files into DINGO.
     """
 
-    Importer = ImporterModule()
+    Importer = TEMPLATE_Import()
+
+    # below works for mantis 0.3.0 and above
+    Importer_Class = TEMPLATE_Import
 
     help = 'Imports TEMPLATE XML files of specified paths into DINGO'
 

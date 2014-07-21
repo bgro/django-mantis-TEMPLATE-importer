@@ -20,6 +20,8 @@ import logging
 
 import re
 
+import hashlib
+
 from django.utils import timezone
 
 from django.utils.dateparse import parse_datetime
@@ -73,12 +75,26 @@ class TEMPLATE_Import:
 
         This function is called
 
-        - for the top-level node of the XML to be imported
+        - for the top-level node of the XML to be imported.
+
         - for each node at which an embedded object is extracted from the XML
           (when this occurs is governed by the following function, the
           embedding_pred
 
-        It must return an identifier and, where applicable, a revision and or timestamp.
+        It must return an identifier and, where applicable, a revision and or timestamp;
+        in the form of a dictionary {'id':<identifier>, 'timestamp': <timestamp>}.
+        How you format the identifier is up to you, because you will have to adopt
+        the code below in function xml_import such that the Information Objects
+        are created with the proper identifier (consisting of qualifying namespace
+        and uri.
+
+        Note: the xml_elt is an XMLNode defined by the Python libxml2 bindings. If you
+        have never worked with these, have a look at
+
+        - Mike Kneller's brief intro: http://mikekneller.com/kb/python/libxml2python/part1
+        - the functions in django-dingos core.xml_utils module
+
+
 
         """
         result = {'id':None,
@@ -91,14 +107,21 @@ class TEMPLATE_Import:
         """
         Predicate for recognizing inlined content in an XML; to
         be used for DINGO's xml-import hook 'embedded_predicate'.
+        The question this predicate must answer is whether
+        the child should be extracted into a separate object.
 
-        It returns either 
+        The function returns either
         - False (the child is not to be extracted)
         - True (the child is extracted but nothing can be inferred
           about what kind of object is extracted)
         - a string giving some indication about the object type
           (if nothing else is known: the name of the element)
 
+        Note: the 'parent' and 'child' arguments are XMLNodes as defined
+        by the Python libxml2 bindings. If you have never worked with these, have a look at
+
+        - Mike Kneller's brief intro: http://mikekneller.com/kb/python/libxml2python/part1
+        - the functions in django-dingos core.xml_utils module
         """
 
         return False
@@ -118,7 +141,7 @@ class TEMPLATE_Import:
                    <Content type="string">.stub</Content>
               </IndicatorItem>
 
-        This is converted into a Dingo Object Dict of the form::
+        During import, this is converted into a Dingo Object Dict of the form::
 
                'IndicatorItem' : { '@id': 'b9ef2559-cc59-4463-81d9-52800545e16e",
                                    '@condition' : "contains",
@@ -130,9 +153,9 @@ class TEMPLATE_Import:
                                               }
                                  }
 
-        For this, the tranformer is called with elt_name = 'IndicatorItem' and contents equal
+        The tranformer is called with elt_name = 'IndicatorItem' and contents equal
         to the dictionary structure shown above. If you want to manipulate certain
-        dictionary structures, the tranformer function is the place for it: it has
+        dictionary structures, the transformer function is the place for it: it has
         to return a pair of ('new_element_name','new_content_dictionary').
 
         """
@@ -148,11 +171,10 @@ class TEMPLATE_Import:
     # The hooking is carried out by defining a list
     # containing pairs of predicates (i.e., a function returning True or False)
     # and an associated hooking function. For each InfoObject2Fact object
-    # (in the first case) resp. each attribute (in the second case),
     # the list is iterated by applying the predicate to input data.
     # If the predicate returns True, then the hooking function is applied
     # and may change the parameters for creation of fact.
-    
+
     # What is usually at least required here is a 'reference handler' that
     # knows how to deal with references created by the import when extracting
     # an embedded object. Please have a look at the OpenIOC and STIX importers
@@ -303,6 +325,7 @@ class TEMPLATE_Import:
                    xml_content=None,
                    markings=None,
                    identifier_ns_uri=None,
+                   uid = None,
                    **kwargs):
         """
         Import a TEMPLATE XML  from file <filepath>.
@@ -338,8 +361,7 @@ class TEMPLATE_Import:
 
         if identifier_ns_uri:
             self.identifier_ns_uri = identifier_ns_uri
-        else:
-            self.identifier_ns_uri = 'test'
+
 
         # Use the generic XML import customized for  OpenIOC import
         # to turn XML into DingoObjDicts
@@ -358,14 +380,23 @@ class TEMPLATE_Import:
         id_and_rev_info = import_result['id_and_rev_info']
         elt_name = import_result['elt_name']
         elt_dict = import_result['dict_repr']
+        file_content = import_result['file_content']
+
+        if uid:
+            id_and_rev_info['id'] = uid
+        else:
+            id_and_rev_info['id'] = hashlib.sha256(file_content).hexdigest()
+
 
         embedded_objects = import_result['embedded_objects']
 
         default_ns = self.namespace_dict.get(elt_dict.get('@@ns',None))
 
         # Export family information.
-        self.iobject_family_name='TEMPLATE'
-        self.iobject_family_revision_name=''
+        family_info_dict = {}
+        if family_info_dict:
+            self.iobject_family_name=family_info_dict['family']
+            self.iobject_family_revision_name=family_info_dict['revision']
 
 
         # Initialize stack with import_results.
@@ -397,7 +428,7 @@ class TEMPLATE_Import:
                                           iobject_type_revision_name= '',
                                           iobject_data=elt_dict,
                                           uid=id_and_rev_info['id'],
-                                          identifier_ns_uri= 'FIXTHIS',#identifier_ns_uri,
+                                          identifier_ns_uri= identifier_ns_uri,
                                           timestamp = ts,
                                           create_timestamp = self.create_timestamp,
                                           markings=markings,
